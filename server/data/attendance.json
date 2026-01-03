@@ -1,0 +1,50 @@
+[
+  {
+    "id": "1001",
+    "userId": "2",
+    "date": "2026-01-02",
+    "checkInTime": "2026-01-02T09:05:00.000Z",
+    "checkOutTime": "2026-01-02T17:30:00.000Z",
+    "status": "PRESENT"
+  },
+  {
+    "id": "1002",
+    "userId": "2",
+    "date": "2026-01-01",
+    "checkInTime": "2026-01-01T09:15:00.000Z",
+    "checkOutTime": "2026-01-01T18:00:00.000Z",
+    "status": "PRESENT"
+  },
+  {
+    "id": "2001",
+    "userId": "1",
+    "date": "2026-01-02",
+    "checkInTime": "2026-01-02T08:50:00.000Z",
+    "checkOutTime": "2026-01-02T17:10:00.000Z",
+    "status": "PRESENT"
+  },
+  {
+    "id": "1767437509982",
+    "userId": "1",
+    "date": "2026-01-03",
+    "checkInTime": "2026-01-03T10:51:49.982Z",
+    "checkOutTime": "2026-01-03T10:51:53.991Z",
+    "status": "PRESENT"
+  },
+  {
+    "id": "1767437554985",
+    "userId": "2",
+    "date": "2026-01-03",
+    "checkInTime": "2026-01-03T10:52:34.985Z",
+    "checkOutTime": "2026-01-03T10:52:36.527Z",
+    "status": "PRESENT"
+  },
+  {
+    "id": "1767438432274",
+    "userId": "101",
+    "date": "2026-01-03",
+    "checkInTime": "2026-01-03T11:07:12.274Z",
+    "checkOutTime": "2026-01-03T11:07:20.112Z",
+    "status": "PRESENT"
+  }
+]
