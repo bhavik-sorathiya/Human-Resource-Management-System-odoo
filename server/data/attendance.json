@@ -46,5 +46,13 @@
     "checkInTime": "2026-01-03T11:07:12.274Z",
     "checkOutTime": "2026-01-03T11:07:20.112Z",
     "status": "PRESENT"
+  },
+  {
+    "id": "1767440063238",
+    "userId": "104",
+    "date": "2026-01-03",
+    "checkInTime": "2026-01-03T11:34:23.238Z",
+    "checkOutTime": null,
+    "status": "PRESENT"
   }
 ]

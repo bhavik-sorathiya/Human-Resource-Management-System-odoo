@@ -1,88 +1,127 @@
 
 const express = require("express");
 const router = express.Router();
-const path = require("path");
-const { readJSON, writeJSON } = require("../utils/fileHandler");
-
 const authenticateJWT = require("../middleware/auth.middleware");
 const requireRole = require("../middleware/role.middleware");
-
-const ATTENDANCE_PATH = path.join(__dirname, "../data/attendance.json");
-const USERS_PATH = path.join(__dirname, "../data/users.json");
+const { pool } = require("../utils/db");
 
 
 // POST /attendance/check-in
-router.post("/check-in", authenticateJWT, (req, res) => {
+router.post("/check-in", authenticateJWT, async (req, res) => {
 	const userId = req.user.userId;
 	const today = new Date().toISOString().slice(0, 10);
-	const attendance = readJSON(ATTENDANCE_PATH);
-	if (attendance.find(a => a.userId === userId && a.date === today)) {
-		return res.status(400).json({ error: "Already checked in today" });
+	const checkInTime = new Date();
+	try {
+		const [existing] = await pool.query(
+			"SELECT id FROM attendance WHERE userId = ? AND date = ?",
+			[userId, today]
+		);
+		if (existing.length) {
+			return res.status(400).json({ error: "Already checked in today" });
+		}
+		const [result] = await pool.query(
+			"INSERT INTO attendance (userId, date, checkInTime, status) VALUES (?, ?, ?, 'PRESENT')",
+			[userId, today, checkInTime]
+		);
+		res.status(201).json({
+			message: "Checked in",
+			entry: {
+				id: result.insertId,
+				userId,
+				date: today,
+				checkInTime: checkInTime.toISOString(),
+				checkOutTime: null,
+				status: "PRESENT",
+			},
+		});
+	} catch (err) {
+		res.status(500).json({ error: "Failed to check in" });
 	}
-	const entry = {
-		id: Date.now().toString(),
-		userId,
-		date: today,
-		checkInTime: new Date().toISOString(),
-		checkOutTime: null,
-		status: "PRESENT"
-	};
-	attendance.push(entry);
-	writeJSON(ATTENDANCE_PATH, attendance);
-	res.status(201).json({ message: "Checked in", entry });
 });
 
 
 // POST /attendance/check-out
-router.post("/check-out", authenticateJWT, (req, res) => {
+router.post("/check-out", authenticateJWT, async (req, res) => {
 	const userId = req.user.userId;
 	const today = new Date().toISOString().slice(0, 10);
-	const attendance = readJSON(ATTENDANCE_PATH);
-	const entry = attendance.find(a => a.userId === userId && a.date === today);
-	if (!entry) {
-		return res.status(400).json({ error: "No check-in found for today" });
+	const checkOutTime = new Date();
+	try {
+		const [existing] = await pool.query(
+			"SELECT * FROM attendance WHERE userId = ? AND date = ?",
+			[userId, today]
+		);
+		const entry = existing[0];
+		if (!entry) {
+			return res.status(400).json({ error: "No check-in found for today" });
+		}
+		if (entry.checkOutTime) {
+			return res.status(400).json({ error: "Already checked out today" });
+		}
+		await pool.query(
+			"UPDATE attendance SET checkOutTime = ? WHERE id = ?",
+			[checkOutTime, entry.id]
+		);
+		res.json({
+			message: "Checked out",
+			entry: {
+				...entry,
+				checkOutTime: checkOutTime.toISOString(),
+			},
+		});
+	} catch (err) {
+		res.status(500).json({ error: "Failed to check out" });
 	}
-	if (entry.checkOutTime) {
-		return res.status(400).json({ error: "Already checked out today" });
-	}
-	entry.checkOutTime = new Date().toISOString();
-	writeJSON(ATTENDANCE_PATH, attendance);
-	res.json({ message: "Checked out", entry });
 });
 
 
 // GET /attendance/me
-router.get("/me", authenticateJWT, (req, res) => {
-	const userId = req.user.userId;
-	const attendance = readJSON(ATTENDANCE_PATH)
-		.filter((a) => a.userId === userId)
-		.sort((a, b) => b.date.localeCompare(a.date));
-	res.json(attendance);
+router.get("/me", authenticateJWT, async (req, res) => {
+	try {
+		const [rows] = await pool.query(
+			"SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC",
+			[req.user.userId]
+		);
+		const normalized = rows.map((r) => ({
+			...r,
+			date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date,
+			checkInTime: r.checkInTime instanceof Date ? r.checkInTime.toISOString() : r.checkInTime,
+			checkOutTime: r.checkOutTime instanceof Date ? r.checkOutTime.toISOString() : r.checkOutTime,
+		}));
+		res.json(normalized);
+	} catch (err) {
+		res.status(500).json({ error: "Failed to load attendance" });
+	}
 });
 
 
 // GET /attendance/all (admin/demo view)
-router.get("/all", authenticateJWT, requireRole("ADMIN"), (req, res) => {
-	const attendance = readJSON(ATTENDANCE_PATH);
-	const users = readJSON(USERS_PATH);
-	const enriched = attendance
-		.map((entry) => {
-			const user = users.find((u) => u.id === entry.userId);
-			return {
-				...entry,
-				user: user
-					? {
-						id: user.id,
-						name: user.name,
-						email: user.email,
-						role: user.role,
-						position: user.position,
-					}
-					: null,
-			};
-		})
-		.sort((a, b) => b.date.localeCompare(a.date));
-	res.json(enriched);
+router.get("/all", authenticateJWT, requireRole("ADMIN"), async (_req, res) => {
+	try {
+		const [rows] = await pool.query(
+			`SELECT a.*, u.id AS userId, u.name, u.email, u.role AS userRole, u.position
+			 FROM attendance a
+			 JOIN users u ON u.id = a.userId
+			 ORDER BY a.date DESC`
+		);
+		const enriched = rows.map((r) => ({
+			id: r.id,
+			userId: r.userId,
+			date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date,
+			checkInTime: r.checkInTime instanceof Date ? r.checkInTime.toISOString() : r.checkInTime,
+			checkOutTime: r.checkOutTime instanceof Date ? r.checkOutTime.toISOString() : r.checkOutTime,
+			status: r.status,
+			user: {
+				id: r.userId,
+				name: r.name,
+				email: r.email,
+				role: r.userRole,
+				position: r.position,
+			},
+		}));
+		res.json(enriched);
+	} catch (err) {
+		res.status(500).json({ error: "Failed to load attendance" });
+	}
 });
 
 module.exports = router;

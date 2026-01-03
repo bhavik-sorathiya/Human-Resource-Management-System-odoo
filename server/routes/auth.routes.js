@@ -2,12 +2,9 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const path = require("path");
-const { readJSON, writeJSON } = require("../utils/fileHandler");
+const { pool } = require("../utils/db");
 
 const JWT_SECRET = process.env.JWT_SECRET || "devsecret";
-const USERS_PATH = path.join(__dirname, "../data/users.json");
-const COMPANIES_PATH = path.join(__dirname, "../data/companies.json");
 
 // POST /auth/login
 router.post("/login", async (req, res) => {
@@ -15,8 +12,8 @@ router.post("/login", async (req, res) => {
 	if (!email || !password) {
 		return res.status(400).json({ error: "Email and password are required" });
 	}
-	const users = readJSON(USERS_PATH);
-	const user = users.find((u) => u.email === email);
+	const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+	const user = rows[0];
 	if (!user) {
 		return res.status(401).json({ error: "Invalid credentials" });
 	}
@@ -34,36 +31,22 @@ router.post("/register", async (req, res) => {
 	if (!name || !email || !password) {
 		return res.status(400).json({ error: "name, email, and password are required" });
 	}
-	const users = readJSON(USERS_PATH);
-	if (users.find((u) => u.email === email)) {
+	const [existing] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+	if (existing.length) {
 		return res.status(409).json({ error: "Email already registered" });
 	}
 	const hashedPassword = await bcrypt.hash(password, 10);
-	const newUser = {
-		id: Date.now().toString(),
-		name,
-		email,
-		password: hashedPassword,
-		role: role.toUpperCase(),
-		companyName: companyName || null,
-		phone: phone || null,
-	};
-	users.push(newUser);
-	writeJSON(USERS_PATH, users);
+	const [result] = await pool.query(
+		`INSERT INTO users (name, email, password, role, companyName, phone) VALUES (?, ?, ?, ?, ?, ?)`,
+		[name, email, hashedPassword, role.toUpperCase(), companyName || null, phone || null]
+	);
 
 	// optionally create company entry
 	if (companyName) {
-		const companies = readJSON(COMPANIES_PATH);
-		const exists = companies.find((c) => c.name.toLowerCase() === companyName.toLowerCase());
-		if (!exists) {
-			companies.push({
-				id: `C-${Date.now()}`,
-				name: companyName,
-				ownerUserId: newUser.id,
-				createdAt: new Date().toISOString(),
-			});
-			writeJSON(COMPANIES_PATH, companies);
-		}
+		await pool.query(
+			`INSERT IGNORE INTO companies (name, ownerUserId) VALUES (?, ?)`
+			, [companyName, result.insertId]
+		);
 	}
 
 	res.status(201).json({ message: "User registered" });

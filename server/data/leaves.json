@@ -46,5 +46,16 @@
     "reason": "xyyyyw",
     "attachmentUrl": "/uploads/1767439027925-WhatsApp_Image_2026-01-03_at_2.29.05_PM_(1).jpeg",
     "createdAt": "2026-01-03T11:17:07.937Z"
+  },
+  {
+    "id": "L-1767440121046",
+    "userId": "104",
+    "startDate": "2026-01-03",
+    "endDate": "2026-01-04",
+    "type": "Sick Leave",
+    "status": "APPROVED",
+    "reason": "sick...",
+    "attachmentUrl": "/uploads/1767440121023-Dayflow_-_Human_Resource_Management_System_(1).pdf",
+    "createdAt": "2026-01-03T11:35:21.046Z"
   }
 ]

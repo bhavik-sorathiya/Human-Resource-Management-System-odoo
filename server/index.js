@@ -1,7 +1,9 @@
 
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { initDb } = require('./utils/db');
 
 const app = express();
 app.use(cors());
@@ -35,6 +37,14 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Database initialization failed', err);
+    process.exit(1);
+  });
